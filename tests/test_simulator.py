@@ -1,9 +1,10 @@
 """Tests du simulateur"""
 import sys
 from pathlib import Path
+
 sys.path.insert(0, str(Path(__file__).parent.parent / 'couche1_sources'))
 
-from simulator import generate_event, EVENT_TYPES, CATEGORIES
+from simulator import generate_event, EVENT_TYPES, CATEGORIES  # noqa: E402
 
 
 def test_generate_event():
@@ -23,3 +24,4 @@ def test_event_structure():
     ]
     for field in required:
         assert field in event
+        

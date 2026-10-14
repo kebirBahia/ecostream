@@ -1,10 +1,11 @@
 """Tests de l'API d'ingestion"""
 import sys
 from pathlib import Path
+
 sys.path.insert(0, str(Path(__file__).parent.parent / 'couche2_ingestion' / 'api'))
 
-from fastapi.testclient import TestClient
-from main import app
+from fastapi.testclient import TestClient  # noqa: E402
+from main import app  # noqa: E402
 
 client = TestClient(app)
 
@@ -36,3 +37,4 @@ def test_ingest_event():
     response = client.post("/ingest/event", json=event)
     assert response.status_code == 200
     assert response.json()['status'] == 'received'
+    

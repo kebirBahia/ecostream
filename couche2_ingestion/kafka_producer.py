@@ -26,3 +26,4 @@ def send_csv_to_kafka(csv_path, topic='ecommerce-events'):
 
 if __name__ == '__main__':
     send_csv_to_kafka('/data/historical_orders.csv')
+    
