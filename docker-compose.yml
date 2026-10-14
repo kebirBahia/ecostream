@@ -1,0 +1,116 @@
+services:
+  # ========== KAFKA ==========
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    container_name: ecostream-zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "2181:2181"
+
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: ecostream-kafka
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+      - "29092:29092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+
+  # ========== CASSANDRA ==========
+  cassandra:
+    image: cassandra:4.1
+    container_name: ecostream-cassandra
+    ports:
+      - "9042:9042"
+    environment:
+      CASSANDRA_CLUSTER_NAME: EcoStream
+      CASSANDRA_DC: datacenter1
+
+  # ========== HBASE (version corrigée) ==========
+  hbase:
+    image: harisekhon/hbase:2.1
+    container_name: ecostream-hbase
+    ports:
+      - "16000:16000"
+      - "16010:16010"
+      - "16020:16020"
+
+  # ========== POSTGRES (pour Airflow) ==========
+  postgres:
+    image: postgres:15
+    container_name: ecostream-postgres
+    environment:
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow
+      POSTGRES_DB: airflow
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+  # ========== AIRFLOW ==========
+  airflow-webserver:
+    image: apache/airflow:2.7.1
+    container_name: ecostream-airflow-web
+    depends_on:
+      - postgres
+    ports:
+      - "8082:8080"
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
+      AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
+      AIRFLOW__WEBSERVER__SECRET_KEY: 'ecostream-secret-key'
+    volumes:
+      - ./couche5_orchestration/airflow/dags:/opt/airflow/dags
+    command: >
+      bash -c "airflow db init && airflow users create --username admin --password admin --firstname Admin --lastname User --role Admin --email admin@ecostream.com && airflow webserver"
+
+  airflow-scheduler:
+    image: apache/airflow:2.7.1
+    container_name: ecostream-airflow-scheduler
+    depends_on:
+      - postgres
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
+      AIRFLOW__WEBSERVER__SECRET_KEY: 'ecostream-secret-key'
+    volumes:
+      - ./couche5_orchestration/airflow/dags:/opt/airflow/dags
+    command: >
+      bash -c "sleep 30 && airflow scheduler"
+
+  # ========== API ==========
+  api:
+    build:
+      context: ./couche2_ingestion/api
+      dockerfile: Dockerfile
+    container_name: ecostream-api
+    ports:
+      - "8000:8000"
+    depends_on:
+      - kafka
+
+  # ========== SIMULATEUR ==========
+  simulator:
+    image: python:3.11-slim
+    container_name: ecostream-simulator
+    depends_on:
+      - kafka
+    volumes:
+      - ./couche1_sources:/app
+    working_dir: /app
+    command: >
+      bash -c "pip install kafka-python-ng==2.2.2 faker==19.13.0 && python simulator.py"
+
+volumes:
+  postgres_data:
